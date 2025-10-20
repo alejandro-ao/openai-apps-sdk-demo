@@ -14,6 +14,13 @@ from typing import Any, Dict, List
 # Initialize the Widget
 # ----------------------------------------------------------------------
 
+version = "0.0.15"
+
+with open("web/dist/assets/index-AH6Gv1YY.css", "r", encoding="utf-8") as f:
+    css_content = f.read()
+with open("web/dist/assets/index-E2t697-6.js", "r", encoding="utf-8") as f:
+    js_content = f.read()
+
 @dataclass(frozen=True)
 class Widget:
     identifier: str
@@ -27,10 +34,10 @@ class Widget:
 HelloWorldWidget: Widget = Widget(
     identifier="hello-world",
     title="Hello World",
-    template_uri="ui://widget/hello-world.html",
+    template_uri=f"ui://widget/hello-world_{version}.html",
     invoking="Hand-tossing a hello world",
     invoked="Served a hello world",
-    html="<div id=\"hello-world-root\"><h1>Hello, World!</h1></div>",
+    html=(f"<div id=\"root\"></div><style>{css_content}</style><script>{js_content}</script>"),
     response_text="Rendered a hello world!",
 )
 
@@ -211,7 +218,7 @@ async def _call_tool_request(req: types.CallToolRequest) -> types.ServerResult:
                 )
             ],
             structuredContent={"widgetInput": input},
-            _meta=meta,
+            _meta=_tool_meta(widget),
         )
     )
 
