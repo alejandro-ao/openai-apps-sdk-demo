@@ -38,22 +38,6 @@ HelloWorldWidget: Widget = Widget(
 MIME_TYPE = "text/html+skybridge"
 
 # ----------------------------------------------------------------------
-# Widget Input Schema
-# ----------------------------------------------------------------------
-
-TOOL_INPUT_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "widgetInput": {
-            "type": "string",
-            "description": "Input to mention when rendering the widget.",
-        }
-    },
-    "required": ["widgetInput"],
-    "additionalProperties": False,
-}
-
-# ----------------------------------------------------------------------
 # Setup the Server
 # ----------------------------------------------------------------------
 
@@ -97,6 +81,18 @@ def _embedded_widget_resource(widget: Widget) -> types.EmbeddedResource:
 # List Tools && Resources
 # ----------------------------------------------------------------------
 
+class HelloWorldInput(BaseModel):
+    """Schema for hello world tools."""
+
+    widget_input: str = Field(
+        ...,
+        alias="widgetInput",
+        description="Input to mention when rendering the widget.",
+    )
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+
 @mcp._mcp_server.list_tools()
 async def _list_tools() -> List[types.Tool]:
     return [
@@ -104,7 +100,7 @@ async def _list_tools() -> List[types.Tool]:
             name=HelloWorldWidget.identifier,
             title=HelloWorldWidget.title,
             description=HelloWorldWidget.title,
-            inputSchema=deepcopy(TOOL_INPUT_SCHEMA),
+            inputSchema=HelloWorldInput.model_json_schema(),
             _meta=_tool_meta(HelloWorldWidget),
         )
     ]
@@ -125,18 +121,6 @@ async def _list_resources() -> List[types.Resource]:
 # ----------------------------------------------------------------------
 # Handle Resource Reads && Tool Calls
 # ----------------------------------------------------------------------
-
-class HelloWorldInput(BaseModel):
-    """Schema for hello world tools."""
-
-    widget_input: str = Field(
-        ...,
-        alias="widgetInput",
-        description="Input to mention when rendering the widget.",
-    )
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
 
 async def _handle_read_resource(req: types.ReadResourceRequest) -> types.ServerResult:
     widget: Widget | None = None
