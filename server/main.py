@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import mcp.types as types
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ HelloWorldWidget: Widget = Widget(
     template_uri="ui://widget/hello-world.html",
     invoking="Hand-tossing a hello world",
     invoked="Served a hello world",
-    html="<div id=\"hello-world-root\"><h1>Hello World</h1></div>",
+    html="<div id=\"hello-world-root\"><h1>Hello, World!</h1></div>",
     response_text="Rendered a hello world!",
 )
 
@@ -55,17 +56,6 @@ TOOL_INPUT_SCHEMA: Dict[str, Any] = {
 # ----------------------------------------------------------------------
 # Setup the Server
 # ----------------------------------------------------------------------
-
-class HelloWorldInput(BaseModel):
-    """Schema for hello world tools."""
-
-    widget_input: str = Field(
-        ...,
-        alias="widgetInput",
-        description="Input to mention when rendering the widget.",
-    )
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 mcp = FastMCP(
     name="hello-world-python",
@@ -135,6 +125,18 @@ async def _list_resources() -> List[types.Resource]:
 # ----------------------------------------------------------------------
 # Handle Resource Reads && Tool Calls
 # ----------------------------------------------------------------------
+
+class HelloWorldInput(BaseModel):
+    """Schema for hello world tools."""
+
+    widget_input: str = Field(
+        ...,
+        alias="widgetInput",
+        description="Input to mention when rendering the widget.",
+    )
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
 
 async def _handle_read_resource(req: types.ReadResourceRequest) -> types.ServerResult:
     widget: Widget | None = None
@@ -208,6 +210,14 @@ async def _call_tool_request(req: types.CallToolRequest) -> types.ServerResult:
         "openai/widgetAccessible": True,
         "openai/resultCanProduceWidget": True,
     }
+    
+    # do something
+    logging.info(f"Calling tool: {req.params.name} with input: {input}")
+    logging.info(f"Working for 2 seconds...")
+    time.sleep(2)
+    logging.info(f"Done!")
+    
+
 
     return types.ServerResult(
         types.CallToolResult(
