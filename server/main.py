@@ -10,6 +10,10 @@ logger = logging.getLogger(__name__)
 from copy import deepcopy
 from typing import Any, Dict, List
 
+# ----------------------------------------------------------------------
+# Initialize the Widget
+# ----------------------------------------------------------------------
+
 @dataclass(frozen=True)
 class Widget:
     identifier: str
@@ -32,6 +36,26 @@ HelloWorldWidget: Widget = Widget(
 
 MIME_TYPE = "text/html+skybridge"
 
+# ----------------------------------------------------------------------
+# Widget Input Schema
+# ----------------------------------------------------------------------
+
+TOOL_INPUT_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "widgetInput": {
+            "type": "string",
+            "description": "Input to mention when rendering the widget.",
+        }
+    },
+    "required": ["widgetInput"],
+    "additionalProperties": False,
+}
+
+# ----------------------------------------------------------------------
+# Setup the Server
+# ----------------------------------------------------------------------
+
 class HelloWorldInput(BaseModel):
     """Schema for hello world tools."""
 
@@ -50,17 +74,9 @@ mcp = FastMCP(
     stateless_http=True,
 )
 
-TOOL_INPUT_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "widgetInput": {
-            "type": "string",
-            "description": "Input to mention when rendering the widget.",
-        }
-    },
-    "required": ["widgetInput"],
-    "additionalProperties": False,
-}
+# ----------------------------------------------------------------------
+# Helper Functions
+# ----------------------------------------------------------------------
 
 def _tool_meta(widget: Widget) -> Dict[str, Any]:
     return {
@@ -87,6 +103,10 @@ def _embedded_widget_resource(widget: Widget) -> types.EmbeddedResource:
         ),
     )
     
+# ----------------------------------------------------------------------
+# List Tools && Resources
+# ----------------------------------------------------------------------
+
 @mcp._mcp_server.list_tools()
 async def _list_tools() -> List[types.Tool]:
     return [
@@ -111,7 +131,11 @@ async def _list_resources() -> List[types.Resource]:
             _meta=_tool_meta(HelloWorldWidget),
         )
     ]
-    
+
+# ----------------------------------------------------------------------
+# Handle Resource Reads && Tool Calls
+# ----------------------------------------------------------------------
+
 async def _handle_read_resource(req: types.ReadResourceRequest) -> types.ServerResult:
     widget: Widget | None = None
     logger.info(f"Read resource: {req.params.uri}")
@@ -200,6 +224,10 @@ async def _call_tool_request(req: types.CallToolRequest) -> types.ServerResult:
 
 mcp._mcp_server.request_handlers[types.CallToolRequest] = _call_tool_request
 mcp._mcp_server.request_handlers[types.ReadResourceRequest] = _handle_read_resource
+
+# ----------------------------------------------------------------------
+# Initialize the Server
+# ----------------------------------------------------------------------
 
 app = mcp.streamable_http_app()
 
