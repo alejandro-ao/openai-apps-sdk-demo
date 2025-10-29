@@ -14,11 +14,11 @@ from typing import Any, Dict, List
 # Initialize the Widget
 # ----------------------------------------------------------------------
 
-version = "0.0.1"
+version = "0.0.2"
 
-with open("web/dist/widgets/example-counter.css", "r", encoding="utf-8") as f:
+with open("web/dist/widgets/hello-world.css", "r", encoding="utf-8") as f:
     css_content = f.read()
-with open("web/dist/widgets/example-counter.js", "r", encoding="utf-8") as f:
+with open("web/dist/widgets/hello-world.js", "r", encoding="utf-8") as f:
     js_content = f.read()
 
 @dataclass(frozen=True)
