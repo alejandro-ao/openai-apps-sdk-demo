@@ -1,25 +1,37 @@
-import mcp.types as types
-from mcp.server.fastmcp import FastMCP
-from dataclasses import dataclass
-import mcp.types as types
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+import json
 import logging
 import time
-
-logger = logging.getLogger(__name__)
-
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List
 
+import mcp.types as types
+from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+logger = logging.getLogger(__name__)
+
 # ----------------------------------------------------------------------
-# Initialize the Widget
+# Locate built widget assets
 # ----------------------------------------------------------------------
 
-version = "0.0.2"
+BASE_DIR = Path(__file__).resolve().parent.parent
+WEB_DIST_DIR = BASE_DIR / "web" / "dist"
+MANIFEST_PATH = WEB_DIST_DIR / "widgets" / "manifest.json"
 
-with open("web/dist/widgets/hello-world.css", "r", encoding="utf-8") as f:
-    css_content = f.read()
-with open("web/dist/widgets/hello-world.js", "r", encoding="utf-8") as f:
-    js_content = f.read()
+if not MANIFEST_PATH.exists():
+    raise RuntimeError(
+        f"Widget manifest not found at {MANIFEST_PATH}. "
+        "Run 'npm run build:widgets' inside the web/ directory first."
+    )
+
+manifest_data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+manifest = manifest_data.get("entries", {})
+
+def _read_asset(rel_path: str) -> str:
+    asset_path = WEB_DIST_DIR / rel_path
+    if not asset_path.exists():
+        raise RuntimeError(f"Expected widget asset missing: {asset_path}")
+    return asset_path.read_text(encoding="utf-8")
 
 @dataclass(frozen=True)
 class Widget:
@@ -30,14 +42,31 @@ class Widget:
     invoked: str
     html: str
     response_text: str
-    
+
+# ----------------------------------------------------------------------
+# Load the tutorial widget from the manifest
+# ----------------------------------------------------------------------
+
+hello_entry = manifest.get("hello-world")
+
+hello_js = _read_asset(hello_entry["js"])
+hello_css = hello_entry.get("css")
+hello_css_content = _read_asset(hello_css) if hello_css else None
+hello_root_id = hello_entry.get("rootId") or "hello-world-root"
+hello_hash = hello_entry.get("hash") or "latest"
+
+hello_html = f'<div id="{hello_root_id}"></div>'
+if hello_css_content:
+    hello_html += f"<style>{hello_css_content}</style>"
+hello_html += f"<script>{hello_js}</script>"
+
 HelloWorldWidget: Widget = Widget(
     identifier="hello-world",
     title="Hello World",
-    template_uri=f"ui://widget/hello-world_{version}.html",
+    template_uri=f"ui://widget/hello-world_{hello_hash}.html",
     invoking="Hand-tossing a hello world",
     invoked="Served a hello world",
-    html=(f"<div id=\"hello-world-root\"></div><style>{css_content}</style><script>{js_content}</script>"),
+    html=hello_html,
     response_text="Rendered a hello world!",
 )
 
@@ -249,3 +278,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("main:app", host="0.0.0.0", port=8000)
+if "js" not in hello_entry:
+    raise RuntimeError(f"'hello-world' entry in {MANIFEST_PATH} is missing the 'js' field.")
