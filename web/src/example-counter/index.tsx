@@ -38,7 +38,7 @@ function App() {
   )
 }
 
-createRoot(document.getElementById('example-root')!).render(
+createRoot(document.getElementById('hello-world-root')!).render(
   <StrictMode>
     <App />
   </StrictMode>,
