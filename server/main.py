@@ -18,20 +18,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 WEB_DIST_DIR = BASE_DIR / "web" / "dist"
 MANIFEST_PATH = WEB_DIST_DIR / "widgets" / "manifest.json"
 
-if not MANIFEST_PATH.exists():
-    raise RuntimeError(
-        f"Widget manifest not found at {MANIFEST_PATH}. "
-        "Run 'npm run build:widgets' inside the web/ directory first."
-    )
-
 manifest_data = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 manifest = manifest_data.get("entries", {})
-
-def _read_asset(rel_path: str) -> str:
-    asset_path = WEB_DIST_DIR / rel_path
-    if not asset_path.exists():
-        raise RuntimeError(f"Expected widget asset missing: {asset_path}")
-    return asset_path.read_text(encoding="utf-8")
 
 @dataclass(frozen=True)
 class Widget:
@@ -49,16 +37,16 @@ class Widget:
 
 hello_entry = manifest.get("hello-world")
 
-hello_js = _read_asset(hello_entry["js"])
-hello_css = hello_entry.get("css")
-hello_css_content = _read_asset(hello_css) if hello_css else None
-hello_root_id = hello_entry.get("rootId") or "hello-world-root"
-hello_hash = hello_entry.get("hash") or "latest"
+hello_js_content = (WEB_DIST_DIR / hello_entry.get("js")).read_text(encoding="utf-8")
+hello_css_content = (WEB_DIST_DIR / hello_entry.get("css")).read_text(encoding="utf-8")
+hello_root_id = hello_entry.get("rootId")
+hello_hash = hello_entry.get("hash")
 
-hello_html = f'<div id="{hello_root_id}"></div>'
-if hello_css_content:
-    hello_html += f"<style>{hello_css_content}</style>"
-hello_html += f"<script>{hello_js}</script>"
+hello_html = f"""
+<div id="{hello_root_id}"></div>
+<style>{hello_css_content}</style>
+<script>{hello_js_content}</script>
+"""
 
 HelloWorldWidget: Widget = Widget(
     identifier="hello-world",
