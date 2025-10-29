@@ -4,6 +4,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { build, loadConfigFromFile } from 'vite'
+import crypto from 'node:crypto'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -20,6 +21,7 @@ const CSS_MODULE_REGEX = /\.module\./i
 const GLOBAL_CSS_CANDIDATES = ['index.css', 'global.css', path.join('styles', 'index.css')]
 
 const BUILD_MODE = process.env.NODE_ENV ?? 'production'
+const HASH_LENGTH = 5
 
 async function main() {
   ensureDirectoryExists(SRC_ROOT)
@@ -45,6 +47,8 @@ async function main() {
   for (const target of entryTargets) {
     const virtualId = `\0virtual-entry:${target.entryFile}`
     const cssToInclude = selectCss(target)
+    const hash = randomHash(HASH_LENGTH)
+    const hashedBasename = `${target.name}-${hash}`
     const plugins = [
       ...basePlugins,
       wrapEntryPlugin(virtualId, target.entryFile, cssToInclude),
@@ -71,14 +75,14 @@ async function main() {
           output: {
             format: 'es',
             inlineDynamicImports: true,
-            entryFileNames: `${target.name}.js`,
-            chunkFileNames: `${target.name}-[hash].js`,
+            entryFileNames: `${hashedBasename}.js`,
+            chunkFileNames: `${hashedBasename}-[hash].js`,
             assetFileNames: (info) => {
               const name = info.name ?? ''
               if (name.endsWith('.css')) {
-                return `${target.name}.css`
+                return `${hashedBasename}.css`
               }
-              return `${target.name}-[hash][extname]`
+              return `${target.name}-${hash}-[hash][extname]`
             },
             preserveModules: false,
           },
@@ -90,8 +94,10 @@ async function main() {
     console.log(`\nBuilding widget "${target.name}" from ${path.relative(WEB_ROOT, target.entryFile)}`)
     await build(entryConfig)
 
-    const widgetJsPath = path.join(OUT_DIR, `${target.name}.js`)
-    const widgetCssPath = path.join(OUT_DIR, `${target.name}.css`)
+    const widgetJsFile = `${hashedBasename}.js`
+    const widgetCssFile = `${hashedBasename}.css`
+    const widgetJsPath = path.join(OUT_DIR, widgetJsFile)
+    const widgetCssPath = path.join(OUT_DIR, widgetCssFile)
 
     ensureFileExists(widgetJsPath, `Expected JavaScript output for "${target.name}" not found: ${widgetJsPath}`)
 
@@ -100,9 +106,10 @@ async function main() {
       js: toPosixPath(path.relative(path.join(WEB_ROOT, 'dist'), widgetJsPath)),
       css: cssExists ? toPosixPath(path.relative(path.join(WEB_ROOT, 'dist'), widgetCssPath)) : null,
       rootId: target.rootId,
+      hash,
     }
 
-    console.log(`✓ Built ${target.name} (${cssExists ? 'js + css' : 'js'})`)
+    console.log(`✓ Built ${target.name} -> ${widgetJsFile}${cssExists ? `, ${widgetCssFile}` : ''}`)
   }
 
   fs.writeFileSync(MANIFEST_PATH, JSON.stringify({ entries: manifest }, null, 2))
@@ -272,6 +279,17 @@ function escapeForRegex(value) {
 
 function toPosixPath(value) {
   return value.split(path.sep).join('/')
+}
+
+const HASH_ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
+
+function randomHash(length) {
+  const bytes = crypto.randomBytes(length)
+  let result = ''
+  for (let i = 0; i < bytes.length; i += 1) {
+    result += HASH_ALPHABET[bytes[i] % HASH_ALPHABET.length]
+  }
+  return result
 }
 
 main().catch((err) => {
