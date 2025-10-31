@@ -2,8 +2,37 @@ import { StrictMode, useState } from 'react'
 import './index.css'
 import { createRoot } from 'react-dom/client'
 
+declare global {
+  interface Window {
+    openai?: {
+      callTool?: (toolName: string, args?: Record<string, unknown>) => Promise<unknown>
+    }
+  }
+}
+
 function App() {
   const [count, setCount] = useState(0)
+  const [isSending, setIsSending] = useState(false)
+  const [sendStatus, setSendStatus] = useState<string | null>(null)
+
+  async function handleSendMessage() {
+    if (!window.openai?.callTool) {
+      setSendStatus('openai.callTool is unavailable in this environment.')
+      return
+    }
+
+    try {
+      setIsSending(true)
+      setSendStatus(null)
+      await window.openai.callTool('message_from_ui', { message: 'hello from ui!' })
+      setSendStatus('Sent "hello from ui!" to the server.')
+    } catch (error) {
+      console.error('Failed to call message_from_ui:', error)
+      setSendStatus('Failed to send message. Check the server logs for details.')
+    } finally {
+      setIsSending(false)
+    }
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -32,6 +61,18 @@ function App() {
           >
             Reset
           </button>
+
+          <button
+            className="min-w-[160px] rounded-xl border border-blue-600 px-6 py-3 text-base font-medium text-blue-600 transition-all duration-200 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleSendMessage}
+            disabled={isSending}
+          >
+            {isSending ? 'Sending...' : 'Send MCP Message'}
+          </button>
+
+          {sendStatus ? (
+            <p className="text-center text-xs text-slate-500">{sendStatus}</p>
+          ) : null}
         </div>
       </div>
     </div>

@@ -60,6 +60,14 @@ HelloWorldWidget: Widget = Widget(
 
 MIME_TYPE = "text/html+skybridge"
 
+MESSAGE_TOOL_NAME = "message_from_ui"
+MESSAGE_TOOL_META: Dict[str, Any] = {
+    "openai/widgetAccessible": True,
+    "openai/toolInvocation/invoking": "Sending message...",
+    "openai/toolInvocation/invoked": "Message delivered.",
+    "openai/resultCanProduceWidget": False,
+}
+
 # ----------------------------------------------------------------------
 # Setup the Server
 # ----------------------------------------------------------------------
@@ -116,6 +124,14 @@ class HelloWorldInput(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
+class MessageFromUIInput(BaseModel):
+    """Schema for the message_from_ui tool."""
+
+    message: str = Field(..., description="The message sent by the UI component.")
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+
 @mcp._mcp_server.list_tools()
 async def _list_tools() -> List[types.Tool]:
     return [
@@ -125,7 +141,14 @@ async def _list_tools() -> List[types.Tool]:
             description=HelloWorldWidget.title,
             inputSchema=HelloWorldInput.model_json_schema(),
             _meta=_tool_meta(HelloWorldWidget),
-        )
+        ),
+        types.Tool(
+            name=MESSAGE_TOOL_NAME,
+            title="Message from UI",
+            description="Receives messages triggered by the UI widget.",
+            inputSchema=MessageFromUIInput.model_json_schema(),
+            _meta=MESSAGE_TOOL_META,
+        ),
     ]
 
 @mcp._mcp_server.list_resources()
@@ -177,6 +200,38 @@ async def _call_tool_request(req: types.CallToolRequest) -> types.ServerResult:
     
     if (req.params.name == HelloWorldWidget.identifier):
         widget = HelloWorldWidget
+
+    if req.params.name == MESSAGE_TOOL_NAME:
+        arguments = req.params.arguments or {}
+        try:
+            payload = MessageFromUIInput.model_validate(arguments)
+        except ValidationError as exc:
+            return types.ServerResult(
+                types.CallToolResult(
+                    content=[
+                        types.TextContent(
+                            type="text",
+                            text=f"Input validation error: {exc.errors()}",
+                        )
+                    ],
+                    isError=True,
+                )
+            )
+
+        message = payload.message
+        logging.info("Received message_from_ui: %s", message)
+        return types.ServerResult(
+            types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text=f"Message noted: {message}",
+                    )
+                ],
+                structuredContent={"message": message},
+                _meta=MESSAGE_TOOL_META,
+            )
+        )
 
     if widget is None:
         return types.ServerResult(
