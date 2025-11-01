@@ -1,19 +1,84 @@
-import { StrictMode, useState } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import './index.css'
 import { createRoot } from 'react-dom/client'
+
+const OPENAI_SET_GLOBALS_EVENT = 'openai:set_globals'
+
+type CallToolArgs = Record<string, unknown>
+
+interface CallToolResponse {
+  structuredContent?: Record<string, unknown>
+  structured_content?: Record<string, unknown>
+  message?: unknown
+  result?: unknown
+}
 
 declare global {
   interface Window {
     openai?: {
-      callTool?: (toolName: string, args?: Record<string, unknown>) => Promise<unknown>
+      callTool?: (toolName: string, args?: CallToolArgs) => Promise<CallToolResponse>
+      toolOutput?: CallToolResponse | null
     }
   }
+}
+
+function extractMessageFromStructured(content: unknown): string | null {
+  if (!content || typeof content !== 'object') {
+    return null
+  }
+
+  const record = content as Record<string, unknown>
+  const direct = record.message
+  if (typeof direct === 'string') {
+    return direct
+  }
+
+  return null
+}
+
+function extractMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+
+  const record = payload as Record<string, unknown>
+
+  if (typeof record.message === 'string') {
+    return record.message
+  }
+
+  const structured = record.structuredContent ?? record.structured_content
+  const structuredMessage = extractMessageFromStructured(structured)
+  if (structuredMessage) {
+    return structuredMessage
+  }
+
+  return null
 }
 
 function App() {
   const [count, setCount] = useState(0)
   const [isSending, setIsSending] = useState(false)
   const [sendStatus, setSendStatus] = useState<string | null>(null)
+  const [lastServerMessage, setLastServerMessage] = useState<string | null>(() =>
+    extractMessage(window.openai?.toolOutput),
+  )
+
+  useEffect(() => {
+    function handleSetGlobals(event: Event) {
+      if (!('detail' in event) || typeof event.detail !== 'object' || !event.detail) {
+        return
+      }
+
+      const globals = (event as CustomEvent<{ globals?: Record<string, unknown> }>).detail.globals
+      if (globals && 'toolOutput' in globals) {
+        setLastServerMessage(extractMessage(globals.toolOutput))
+      }
+    }
+
+    window.addEventListener(OPENAI_SET_GLOBALS_EVENT, handleSetGlobals)
+    return () => window.removeEventListener(OPENAI_SET_GLOBALS_EVENT, handleSetGlobals)
+  }, [])
 
   async function handleSendMessage() {
     if (!window.openai?.callTool) {
@@ -24,7 +89,11 @@ function App() {
     try {
       setIsSending(true)
       setSendStatus(null)
-      await window.openai.callTool('message_from_ui', { message: 'hello from ui!' })
+      const response = await window.openai.callTool('message_from_ui', { message: 'hello from ui!' })
+      const messageFromResponse = extractMessage(response)
+      if (messageFromResponse) {
+        setLastServerMessage(messageFromResponse)
+      }
       setSendStatus('Sent "hello from ui!" to the server.')
     } catch (error) {
       console.error('Failed to call message_from_ui:', error)
@@ -69,6 +138,10 @@ function App() {
           >
             {isSending ? 'Sending...' : 'Send MCP Message'}
           </button>
+
+          <div className="w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm text-blue-700">
+            {lastServerMessage ?? 'No message from the server yet.'}
+          </div>
 
           {sendStatus ? (
             <p className="text-center text-xs text-slate-500">{sendStatus}</p>

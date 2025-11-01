@@ -228,7 +228,7 @@ async def _call_tool_request(req: types.CallToolRequest) -> types.ServerResult:
                         text=f"Message noted: {message}",
                     )
                 ],
-                structuredContent={"message": message},
+                structuredContent={"message": f"echo {message}"},
                 _meta=MESSAGE_TOOL_META,
             )
         )
